@@ -187,7 +187,7 @@ int freeMemory(Memory* m){
 		cur = cur->next;
 		free(old);
 	}
-	mirrorNode* mCur = m->mirrors
+	mirrorNode* mCur = m->mirrors;
 	mirrorNode* mTemp;
 	while (mCur != NULL){
 		mTemp = mCur->next;
