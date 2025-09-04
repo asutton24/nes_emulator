@@ -275,6 +275,46 @@ static int stackIndexRegsInstructions(){
 	return 2;
 }
 
+static int bitInstuctions(){
+	byte adMode = (read8(cmem, pc) >> 2) & 7;
+	byte operand;
+	if (adMode != ZPG && adMode != ABSOLUTE) return 2;
+	operand = getOperand(adMode);
+	flags = (flags & 61) | (operand & 192) | (a & operand == 0);
+	if (adMode == ZPG) return 3;
+	return 4;
+}
+
+static int storeYInstructions(){
+	byte adMode = (read8(cmem, pc) >> 2) & 7;
+	byte operand;
+	if (adMode != ZPG && adMode != ABSOLUTE && adMode != ZPGX) return 2;
+	operand = getOperand(adMode);
+	write8(cmem, cmem->lastRead, y);
+	if (adMode == ZPG) return 3;
+	return 4;	
+}
+
+static int ldYInstructions(){
+	byte adMode = (read8(cmem, pc) >> 2) & 7;
+	byte operand;
+	if (adMode != 0 && adMode % 2 == 0) return 2;
+	if (adMode == 0) adMode = IMMEDIATE;
+	y = getOperand(adMode);
+	switch (adMode){
+		case IMMEDIATE:
+			return 2;
+		case ZPG:
+			return 3;
+		case ZPGX:
+		case ABSOLUTE:
+			pageCross = 0;
+		case ABSOLUTEX:
+			return 4 + pageCross;
+	}
+	return 2;
+}
+
 int runcmd(){
 	byte cycles;
 	byte op = read8(cmem, pc);
@@ -286,5 +326,40 @@ int runcmd(){
 	else if (opC == 0 && opB == 4) return branchInstructions();
 	else if (opC == 0 && opB == 6) return flagSetInstructions();
 	else if (opC == 0 && opB == 2) return stackIndexRegsInstructions();
-
+	else if (op == 0){
+		flags = flags | 16;
+		pc = read16(cmem, 0xFFFE);
+		return 7;
+	} else if (op == 0x20){
+		write8(cmem, 0x100 + sp, (pc + 2) / 256);
+		sp--;
+		write8(cmem, 0x100 + sp, (pc + 2) % 256);
+		sp--;
+		pc = read16(cmem, pc + 1);
+		return 5;
+	} else if (op == 0x40){
+		sp++;
+		flags = read8(cmem, 0x100 + sp);
+		sp++;
+		pc = read8(cmem, 0x100 + sp);
+		sp++;
+		pc += read8(cmem, 0x100 + sp) * 256;
+		pc++;
+		return 6;
+	} else if (op == 0x60){	
+		sp++;
+		pc = read8(cmem, 0x100 + sp);
+		sp++;
+		pc += read8(cmem, 0x100 + sp) * 256;
+		pc++;
+		return 6;
+	} else if (op == 0x4C){
+		pc = read16(cmem, pc + 1);
+		return 3;
+	} else if (op == 0x6C){
+		pc = read16(cmem, read16(cmem, pc + 1));
+		return 5;
+	} else if (opC == 0 && opA == 1) return bitInstructions();
+	else if (opC == 0 && opA == 4) return storeYInstructions();
+	else if (opC == 0 && opA == 5) return ldYInstructions();
 }
