@@ -1,6 +1,6 @@
 #include "memory.h"
 
-byte read(Memory* m, dbyte add){
+byte read8(Memory* m, dbyte add){
 	add = mirrorAddress(m->mirrors, add);
 	m->lastRead = add; 
 	bankList* current = m->head;
@@ -18,7 +18,7 @@ byte read(Memory* m, dbyte add){
 	return 0;
 }
 
-byte write(Memory* m, dbyte add, byte val){
+byte write8(Memory* m, dbyte add, byte val){
 	add = mirrorAddress(m->mirrors, add);
 	m->lastWrite = add; 
 	bankList* current = m->head;
@@ -40,11 +40,11 @@ byte write(Memory* m, dbyte add, byte val){
 }
 
 dbyte read16(Memory* m, dbyte add){
-	return read(m, add) + read(m, add + 1) * 256;
+	return read8(m, add) + read8(m, add + 1) * 256;
 }
 
 byte write16(Memory* m, dbyte add, dbyte val){
-	return write(m, add, val % 256) + write(m, add + 1, val >> 8);
+	return write8(m, add, val % 256) + write8(m, add + 1, val >> 8);
 }
 
 dbyte mirrorAddress(mirrorNode* head, dbyte add){

@@ -37,8 +37,8 @@ typedef struct memoryList{
 	dbyte lastWrite;
 } Memory;
 
-byte read(Memory* m, dbyte add);
-byte write(Memory* m, dbyte add, byte val);
+byte read8(Memory* m, dbyte add);
+byte write8(Memory* m, dbyte add, byte val);
 dbyte read16(Memory* m, dbyte add);
 byte write16(Memory* m, dbyte add, dbyte val);
 dbyte mirrorAddress(mirrorNode* head, dbyte add);
