@@ -6,5 +6,8 @@
 extern Memory* cmem;
 
 int runcmd(void);
+int raiseInterrupt(void);
+int raiseNMI(void);
+int resetCPU(void);
 
 #endif

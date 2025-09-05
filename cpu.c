@@ -12,12 +12,13 @@
 static byte a;
 static byte x;
 static byte y;
-static byte flags;
-static byte sp;
+static byte flags = 0x20;
+static byte sp = 0xFF;
 static dbyte pc;
 static byte pageCross;
 
 Memory* cmem;
+byte cupInterrupt = 0;
 
 static void setFlagsFromReg(char reg){
 	byte val = a * (reg == 'a') + x * (reg == 'x') + y * (reg == 'y');
@@ -386,6 +387,21 @@ static int incDecInstructions(){
 }
 
 int runcmd(){
+	switch (cpuInterrupt){
+		case 1:
+			cpuInterrupt = 0;
+			if (flags & 4) break;
+			pc = read16(cmem, 0xFFFE);
+			break;
+		case 2:
+			cpuInterrupt = 0;
+			pc = read16(cmem, 0xFFFA);
+			break;
+		case 3:
+			cpuInterrupt = 0;
+			pc = read16(cmem, 0xFFFC);
+			break;
+	}
 	byte cycles;
 	byte op = read8(cmem, pc);
 	byte opA = op >> 5;
@@ -457,4 +473,19 @@ int runcmd(){
 	else if (opC == 2 && opA == 5) return ldXYInstructions('x');
 	else if (opC == 2 && opA > 5) return incDecInstructions();
 	else return 2;
+}
+
+int raiseInterrupt(){
+	cpuInterrupt = 1;
+	return 0;	
+}
+
+int raiseNMI(){
+	cpuInterrupt = 2;
+	return 0;
+}
+
+int resetCPU(){
+	cpuInterrupt = 3;
+	return 0;
 }
