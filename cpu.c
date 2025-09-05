@@ -67,6 +67,7 @@ static byte getOperand(int mode){
 
 static byte acm(char mode, byte op){
 	byte olda = a;
+	byte temp;
 	switch (mode){
 		case '+':
 			a += op + (flags & 1);
@@ -85,8 +86,11 @@ static byte acm(char mode, byte op){
 			a = a ^ op;
 			break;
 		case 'c':
+			flags = flags | 1;
+			temp = flags & 64;
 			acm('-', op);
 			a = olda;
+			flags = (flags & 191) | temp;
 			return 0;
 		case 'l':
 			a = op;
@@ -315,6 +319,29 @@ static int ldYInstructions(){
 	return 2;
 }
 
+static int cmpxyInstructions(){
+	byte op = read8(cmem, pc);
+	byte adMode = (op >> 2) & 7;
+	byte val;
+	int cmpVal;
+	byte operand;
+	if (adMode == 2 || adMode > 3) return 2;
+	if (adMode == 0) adMode = IMMEDIATE;
+	if (op >> 5 == 6) val = y;
+	else val = x;
+	cmpVal = val - getOperand(adMode);
+	flags = (flags & 124) | (cmpVal & 128) | (2 * (cmpVal == 0)) | (cmpVal >= 0);
+	switch (adMode){
+		case IMMEDIATE:
+			return 2;
+		case ZPG:
+			return 3;
+		case ABSOLUTE:
+			return 4;
+	}
+	return 2;
+}
+
 int runcmd(){
 	byte cycles;
 	byte op = read8(cmem, pc);
@@ -362,4 +389,5 @@ int runcmd(){
 	} else if (opC == 0 && opA == 1) return bitInstructions();
 	else if (opC == 0 && opA == 4) return storeYInstructions();
 	else if (opC == 0 && opA == 5) return ldYInstructions();
+	else if (opC == 0 && opA > 5) return cmpxyInstructions();
 }
