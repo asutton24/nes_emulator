@@ -4,6 +4,7 @@ Memory* vmem;
 byte frameBuffer[61440] = {0};
 int ppuCycle = 0;
 static byte oam[256];
+static byte candidates;
 static byte* ppuRegs;
 static dbyte ppuAddr;
 double startOfFrame;
@@ -16,9 +17,17 @@ static int linkPPUtoCPU(){
 	return 0;
 }
 
+static int collectCandidates(int scanline){
+	int cIndex = 0;
+	for (int i = 0; i < 64; i++;){
+		
+	}
+}
+
 int attemptPixelDraw(){
 	
 }
+
 int queryRegisters(){
 	
 }

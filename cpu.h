@@ -2,6 +2,7 @@
 #define CPU_H
 
 #include "memory.h"
+#include <ncurses.h>
 
 extern Memory* cmem;
 

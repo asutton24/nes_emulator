@@ -18,7 +18,7 @@ static dbyte pc;
 static byte pageCross;
 
 Memory* cmem;
-byte cupInterrupt = 0;
+static byte cpuInterrupt = 0;
 
 static void setFlagsFromReg(char reg){
 	byte val = a * (reg == 'a') + x * (reg == 'x') + y * (reg == 'y');
@@ -47,12 +47,12 @@ static byte getOperand(int mode){
 			pc += 2;
 			oldAddress = read16(cmem, pc - 2);
 			pageCross = (oldAddress & 0xFF00) != ((oldAddress + x) & 0xFF00);
-			return read8(cmem, read16(cmem, oldAddress + x));		
+			return read8(cmem, oldAddress + x);		
 		case ABSOLUTEY:
 			pc += 2;
 			oldAddress = read16(cmem, pc - 2);
 			pageCross = (oldAddress & 0xFF00) != ((oldAddress + y) & 0xFF00);
-			return read8(cmem, read16(cmem, oldAddress + y));		
+			return read8(cmem, oldAddress + y);		
 		case INDIRECTX:
 			pc++;
 			return read8(cmem, read16(cmem, (read8(cmem, pc - 1) + x)	% 256));
@@ -72,7 +72,7 @@ static byte acm(char mode, byte op){
 	switch (mode){
 		case '+':
 			a += op + (flags & 1);
-			flags = (flags & 0xFE) | (a < olda);
+			flags = (flags & 0xFE) | (olda + op + (flags & 1) > 255);
 			flags = (flags & 0xBF) | (((olda & 128) && (op & 128) && !(a & 128)) || (!(olda & 128) && !(op & 128) && (a & 128)));
 			break;
 		case '-':
@@ -87,11 +87,8 @@ static byte acm(char mode, byte op){
 			a = a ^ op;
 			break;
 		case 'c':
-			flags = flags | 1;
-			temp = flags & 64;
-			acm('-', op);
-			a = olda;
-			flags = (flags & 191) | temp;
+			temp = a - op;
+			flags = (flags & 124) | (temp & 128) | (2 * (a == op)) | (a >= op);
 			return 0;
 		case 'l':
 			a = op;
@@ -102,13 +99,13 @@ static byte acm(char mode, byte op){
 }
 
 static int c1Instructions(){
-	char* opmap = "|&^+xlcs";
+	char* opmap = "|&^+xlc-";
 	byte cycleVals[8] = {6, 3, 2, 4, 5, 4, 4, 4};
 	byte opcode = read8(cmem, pc);
 	byte adMode = (opcode >> 2) & 7;
 	byte operand = getOperand(adMode);
 	if (opcode >> 5 == 4){
-		if (adMode != IMMEDIATE){ 
+		if (adMode != IMMEDIATE){
 			write8(cmem, cmem->lastRead, a);
 			if (adMode == ABSOLUTEX || adMode == ABSOLUTEY || adMode == INDIRECTY) pageCross = 1;
 		} 
@@ -192,10 +189,10 @@ static int branchInstructions(){
 			bitToTest = 1;
 			break;
 		case 3:
-			bitToTest = 3;
+			bitToTest = 2;
 			break;
 	}
-	if (flags & bitToTest == branchCondition){
+	if (((flags & bitToTest) > 0) == branchCondition){
 		cycles++;
 		pc++;
 		operand = read8(cmem, pc);
@@ -236,6 +233,7 @@ static int flagSetInstructions(){
 	}
 	if (op % 2 == 0) flags = flags & (bitMask ^ 0xFF);
 	else flags = flags | bitMask;
+	pc++;
 	return 2;
 }
 
@@ -285,7 +283,7 @@ static int bitInstructions(){
 	byte operand;
 	if (adMode != ZPG && adMode != ABSOLUTE) return 2;
 	operand = getOperand(adMode);
-	flags = (flags & 61) | (operand & 192) | (a & operand == 0);
+	flags = (flags & 61) | (operand & 192) | (2 * ((a & operand) == 0));
 	if (adMode == ZPG) return 3;
 	return 4;
 }
@@ -320,8 +318,10 @@ static int ldXYInstructions(char reg){
 		x = oldY;
 	}
 	y = getOperand(adMode);
-	x = y;
-	y = oldY;
+	if (reg == 'x'){
+		x = y;
+		y = oldY;
+	}
 	setFlagsFromReg(reg);
 	switch (adMode){
 		case IMMEDIATE:
@@ -341,14 +341,15 @@ static int cmpXYInstructions(){
 	byte op = read8(cmem, pc);
 	byte adMode = (op >> 2) & 7;
 	byte val;
-	int cmpVal;
+	byte cmpVal;
 	byte operand;
 	if (adMode == 2 || adMode > 3) return 2;
 	if (adMode == 0) adMode = IMMEDIATE;
 	if (op >> 5 == 6) val = y;
 	else val = x;
-	cmpVal = val - getOperand(adMode);
-	flags = (flags & 124) | (cmpVal & 128) | (2 * (cmpVal == 0)) | (cmpVal >= 0);
+	operand = getOperand(adMode);
+	cmpVal = val - operand;
+	flags = (flags & 124) | (cmpVal & 128) | (2 * (val == operand)) | (val >= operand);
 	switch (adMode){
 		case IMMEDIATE:
 			return 2;
@@ -406,7 +407,7 @@ int runcmd(){
 	byte op = read8(cmem, pc);
 	byte opA = op >> 5;
 	byte opB = (op >> 2) & 7;
-	byte opC = op & 3;
+	byte opC = op & 3;	
 	if (opC == 1) return c1Instructions();
 	else if (opC == 2 && opA < 4) return shiftInstructions();
 	else if (opC == 0 && opB == 4) return branchInstructions();
@@ -451,22 +452,29 @@ int runcmd(){
 	else if (opC == 0 && opA > 5) return cmpXYInstructions();
 	else if (op == 0x8A){
 		a = x;
+		pc++;
 		setFlagsFromReg('a');
 		return 2;
 	} else if (op == 0xAA){
 		x = a;
+		pc++;
 		setFlagsFromReg('x');
 		return 2;
 	} else if (op == 0xCA){
 		x--;
+		pc++;
 		setFlagsFromReg('x');
 		return 2;
-	} else if (op == 0xEA) return 2;
-	else if (op == 0x9A){
+	} else if (op == 0xEA){
+		pc++;	
+		return 2;
+	} else if (op == 0x9A){
 		sp = x;
+		pc++;
 		return 2;
 	} else if (op == 0xBA){
 		x = sp;
+		pc++;
 		setFlagsFromReg('x');
 		return 2;
 	} else if (opC == 2 && opA == 4) return storeXYInstructions('x');
