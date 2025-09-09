@@ -55,7 +55,7 @@ static byte getOperand(int mode){
 			return read8(cmem, oldAddress + y);		
 		case INDIRECTX:
 			pc++;
-			return read8(cmem, read16(cmem, (read8(cmem, pc - 1) + x)	% 256));
+			return read8(cmem, read16(cmem, (read8(cmem, pc - 1) + x) % 256));
 		case INDIRECTY:
 			pc++;
 			oldAddress = read16(cmem, read8(cmem, pc - 1));
@@ -72,8 +72,8 @@ static byte acm(char mode, byte op){
 	switch (mode){
 		case '+':
 			a += op + (flags & 1);
-			flags = (flags & 0xFE) | (olda + op + (flags & 1) > 255);
-			flags = (flags & 0xBF) | (((olda & 128) && (op & 128) && !(a & 128)) || (!(olda & 128) && !(op & 128) && (a & 128)));
+			flags = (flags & 0xFE) | ((olda + op + (flags & 1)) > 255);
+			flags = (flags & 0xBF) | ((((olda & 128) && (op & 128) && !(a & 128)) || (!(olda & 128) && !(op & 128) && (a & 128))) * 64);
 			break;
 		case '-':
 			return acm('+', op ^ 0xFF);
@@ -213,6 +213,7 @@ static int flagSetInstructions(){
 	if (op == 4){
 		//For some reason TYA falls here
 		a = y;
+		pc++;
 		setFlagsFromReg('a');
 		return 2;
 	}
@@ -407,7 +408,7 @@ int runcmd(){
 	byte op = read8(cmem, pc);
 	byte opA = op >> 5;
 	byte opB = (op >> 2) & 7;
-	byte opC = op & 3;	
+	byte opC = op & 3;
 	if (opC == 1) return c1Instructions();
 	else if (opC == 2 && opA < 4) return shiftInstructions();
 	else if (opC == 0 && opB == 4) return branchInstructions();
